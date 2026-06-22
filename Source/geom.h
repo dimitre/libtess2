@@ -73,7 +73,6 @@
 
 int tesvertLeq( TESSvertex *u, TESSvertex *v );
 TESSreal	tesedgeEval( TESSvertex *u, TESSvertex *v, TESSvertex *w );
-TESSreal	tesedgeSign( TESSvertex *u, TESSvertex *v, TESSvertex *w );
 TESSreal	testransEval( TESSvertex *u, TESSvertex *v, TESSvertex *w );
 TESSreal	testransSign( TESSvertex *u, TESSvertex *v, TESSvertex *w );
 int tesvertCCW( TESSvertex *u, TESSvertex *v, TESSvertex *w );

@@ -125,9 +125,7 @@ struct TESSface {
 	TESShalfEdge *anEdge;    /* a half edge with this left face */
 
 	/* Internal data (keep hidden) */
-	TESSface *trail;     /* "stack" for conversion to strips */
 	TESSindex n;		/* to allow identiy unique faces */
-	char marked;     /* flag for conversion to strips */
 	char inside;     /* this face is in the polygon interior */
 };
 

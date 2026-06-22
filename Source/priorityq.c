@@ -195,7 +195,7 @@ PQhandle pqHeapInsert( TESSalloc* alloc, PriorityQHeap *pq, PQkey keyNew )
 	int curr;
 	PQhandle free;
 
-	curr = ++ pq->size;
+	curr = pq->size + 1;
 	if( (curr*2) > pq->max ) {
 		if (!alloc->memrealloc)
 		{
@@ -206,22 +206,26 @@ PQhandle pqHeapInsert( TESSalloc* alloc, PriorityQHeap *pq, PQkey keyNew )
 			PQnode *saveNodes= pq->nodes;
 			PQhandleElem *saveHandles= pq->handles;
 
-			// If the heap overflows, double its size.
-			pq->max <<= 1;
-			pq->nodes = (PQnode *)alloc->memrealloc( alloc->userData, pq->nodes, 
-				(size_t)((pq->max + 1) * sizeof( pq->nodes[0] )));
+			// If the heap overflows, double its size.  Don't commit the new
+			// size/capacity until both reallocs have succeeded, otherwise a
+			// failure leaves size/max inconsistent with the backing arrays.
+			int newMax = pq->max << 1;
+			pq->nodes = (PQnode *)alloc->memrealloc( alloc->userData, pq->nodes,
+				(size_t)((newMax + 1) * sizeof( pq->nodes[0] )));
 			if (pq->nodes == NULL) {
-				pq->nodes = saveNodes;	// restore ptr to free upon return 
+				pq->nodes = saveNodes;	// restore ptr to free upon return
 				return INV_HANDLE;
 			}
 			pq->handles = (PQhandleElem *)alloc->memrealloc( alloc->userData, pq->handles,
-				(size_t) ((pq->max + 1) * sizeof( pq->handles[0] )));
+				(size_t) ((newMax + 1) * sizeof( pq->handles[0] )));
 			if (pq->handles == NULL) {
-				pq->handles = saveHandles; // restore ptr to free upon return 
+				pq->handles = saveHandles; // restore ptr to free upon return
 				return INV_HANDLE;
 			}
+			pq->max = newMax;
 		}
 	}
+	pq->size = curr;
 
 	if( pq->freeList == 0 ) {
 		free = curr;
@@ -427,7 +431,7 @@ PQhandle pqInsert( TESSalloc* alloc, PriorityQ *pq, PQkey keyNew )
 		return pqHeapInsert( alloc, pq->heap, keyNew );
 	}
 	curr = pq->size;
-	if( ++ pq->size >= pq->max ) {
+	if( curr + 1 >= pq->max ) {
 		if (!alloc->memrealloc)
 		{
 			return INV_HANDLE;
@@ -435,17 +439,21 @@ PQhandle pqInsert( TESSalloc* alloc, PriorityQ *pq, PQkey keyNew )
 		else
 		{
 			PQkey *saveKey= pq->keys;
-			// If the heap overflows, double its size.
-			pq->max <<= 1;
-			pq->keys = (PQkey *)alloc->memrealloc( alloc->userData, pq->keys, 
-				(size_t)(pq->max * sizeof( pq->keys[0] )));
-			if (pq->keys == NULL) { 
-				pq->keys = saveKey;  // restore ptr to free upon return 
+			// If the heap overflows, double its size.  Don't commit the new
+			// size/capacity until the realloc has succeeded, otherwise a
+			// failure leaves size pointing past the end of the old array.
+			int newMax = pq->max << 1;
+			pq->keys = (PQkey *)alloc->memrealloc( alloc->userData, pq->keys,
+				(size_t)(newMax * sizeof( pq->keys[0] )));
+			if (pq->keys == NULL) {
+				pq->keys = saveKey;  // restore ptr to free upon return
 				return INV_HANDLE;
 			}
+			pq->max = newMax;
 		}
 	}
-	assert(curr != INV_HANDLE); 
+	++ pq->size;
+	assert(curr != INV_HANDLE);
 	pq->keys[curr] = keyNew;
 
 	/* Negative handles index the sorted array. */

@@ -57,6 +57,10 @@ Dict *dictNewDict( TESSalloc* alloc, void *frame, int (*leq)(TESStesselator *fra
 	if (alloc->dictNodeBucketSize > 4096)
 		alloc->dictNodeBucketSize = 4096;
 	dict->nodePool = createBucketAlloc( alloc, "Dict", sizeof(DictNode), alloc->dictNodeBucketSize );
+	if (dict->nodePool == NULL) {
+		alloc->memfree( alloc->userData, dict );
+		return NULL;
+	}
 
 	return dict;
 }

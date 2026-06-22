@@ -219,6 +219,9 @@ void tessProjectPolygon( TESStesselator *tess )
 	TESSreal norm[3];
 	TESSreal *sUnit, *tUnit;
 	int i, first, computedNormal = FALSE;
+#if defined(FOR_TRITE_TEST_PROGRAM) || defined(TRUE_PROJECT)
+	TESSreal w;
+#endif
 
 	norm[0] = tess->normal[0];
 	norm[1] = tess->normal[1];
@@ -646,9 +649,16 @@ TESStesselator* tessNewTess( TESSalloc* alloc )
 		tess->alloc.regionBucketSize = 4096;
 	tess->regionPool = createBucketAlloc( &tess->alloc, "Regions",
 										 sizeof(ActiveRegion), tess->alloc.regionBucketSize );
+	if (tess->regionPool == NULL) {
+		alloc->memfree( alloc->userData, tess );
+		return 0;          /* out of memory */
+	}
 
 	// Initialize to begin polygon.
 	tess->mesh = NULL;
+	tess->dict = NULL;
+	tess->pq = NULL;
+	tess->event = NULL;
 
 	tess->status = TESS_STATUS_OK;
 	tess->vertexIndexCounter = 0;
@@ -668,6 +678,19 @@ void tessDeleteTess( TESStesselator *tess )
 	struct TESSalloc alloc = tess->alloc;
 
 	deleteBucketAlloc( tess->regionPool );
+
+	/* If tessTesselate() aborted mid-sweep (e.g. out of memory), the edge
+	* dictionary and priority queue may not have been torn down yet.  The Done
+	* helpers NULL these out on the normal path, so this only frees a leak.
+	*/
+	if( tess->dict != NULL ) {
+		dictDeleteDict( &alloc, tess->dict );
+		tess->dict = NULL;
+	}
+	if( tess->pq != NULL ) {
+		pqDeletePriorityQ( &alloc, tess->pq );
+		tess->pq = NULL;
+	}
 
 	if( tess->mesh != NULL ) {
 		tessMeshDeleteMesh( &alloc, tess->mesh );
@@ -757,7 +780,7 @@ void OutputPolymesh( TESStesselator *tess, TESSmesh *mesh, int elementType, int 
 		maxFaceCount *= 2;
 	tess->elements = (TESSindex*)tess->alloc.memalloc( tess->alloc.userData,
 													  sizeof(TESSindex) * maxFaceCount * polySize );
-	if (!tess->elements)
+	if (!tess->elements && maxFaceCount * polySize > 0)
 	{
 		tess->status = TESS_STATUS_OUT_OF_MEMORY;
 		return;
@@ -766,7 +789,7 @@ void OutputPolymesh( TESStesselator *tess, TESSmesh *mesh, int elementType, int 
 	tess->vertexCount = maxVertexCount;
 	tess->vertices = (TESSreal*)tess->alloc.memalloc( tess->alloc.userData,
 													 sizeof(TESSreal) * tess->vertexCount * vertexSize );
-	if (!tess->vertices)
+	if (!tess->vertices && tess->vertexCount * vertexSize > 0)
 	{
 		tess->status = TESS_STATUS_OUT_OF_MEMORY;
 		return;
@@ -774,7 +797,7 @@ void OutputPolymesh( TESStesselator *tess, TESSmesh *mesh, int elementType, int 
 
 	tess->vertexIndices = (TESSindex*)tess->alloc.memalloc( tess->alloc.userData,
 														    sizeof(TESSindex) * tess->vertexCount );
-	if (!tess->vertexIndices)
+	if (!tess->vertexIndices && tess->vertexCount > 0)
 	{
 		tess->status = TESS_STATUS_OUT_OF_MEMORY;
 		return;
@@ -865,7 +888,7 @@ void OutputContours( TESStesselator *tess, TESSmesh *mesh, int vertexSize )
 
 	tess->elements = (TESSindex*)tess->alloc.memalloc( tess->alloc.userData,
 													  sizeof(TESSindex) * tess->elementCount * 2 );
-	if (!tess->elements)
+	if (!tess->elements && tess->elementCount > 0)
 	{
 		tess->status = TESS_STATUS_OUT_OF_MEMORY;
 		return;
@@ -873,7 +896,7 @@ void OutputContours( TESStesselator *tess, TESSmesh *mesh, int vertexSize )
 
 	tess->vertices = (TESSreal*)tess->alloc.memalloc( tess->alloc.userData,
 													  sizeof(TESSreal) * tess->vertexCount * vertexSize );
-	if (!tess->vertices)
+	if (!tess->vertices && tess->vertexCount * vertexSize > 0)
 	{
 		tess->status = TESS_STATUS_OUT_OF_MEMORY;
 		return;
@@ -881,7 +904,7 @@ void OutputContours( TESStesselator *tess, TESSmesh *mesh, int vertexSize )
 
 	tess->vertexIndices = (TESSindex*)tess->alloc.memalloc( tess->alloc.userData,
 														    sizeof(TESSindex) * tess->vertexCount );
-	if (!tess->vertexIndices)
+	if (!tess->vertexIndices && tess->vertexCount > 0)
 	{
 		tess->status = TESS_STATUS_OUT_OF_MEMORY;
 		return;
@@ -1121,7 +1144,7 @@ int tessGetElementCount( TESStesselator *tess )
 	return tess->elementCount;
 }
 
-const int* tessGetElements( TESStesselator *tess )
+const TESSindex* tessGetElements( TESStesselator *tess )
 {
 	return tess->elements;
 }

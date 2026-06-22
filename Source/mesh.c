@@ -166,8 +166,6 @@ static void MakeFace( TESSface *newFace, TESShalfEdge *eOrig, TESSface *fNext )
 	fNext->prev = fNew;
 
 	fNew->anEdge = eOrig;
-	fNew->trail = NULL;
-	fNew->marked = FALSE;
 
 	/* The new face is marked "inside" if the old one was.  This is a
 	* convenience for the common case where a face has been split in two.
@@ -272,7 +270,12 @@ TESShalfEdge *tessMeshMakeEdge( TESSmesh *mesh )
 	} 
 
 	e = MakeEdge( mesh, &mesh->eHead );
-	if (e == NULL) return NULL;
+	if (e == NULL) {
+		bucketFree( mesh->vertexBucket, newVertex1 );
+		bucketFree( mesh->vertexBucket, newVertex2 );
+		bucketFree( mesh->faceBucket, newFace );
+		return NULL;
+	}
 
 	MakeVertex( newVertex1, e, &mesh->vHead );
 	MakeVertex( newVertex2, e->Sym, &mesh->vHead );
@@ -609,6 +612,14 @@ TESSmesh *tessMeshNewMesh( TESSalloc* alloc )
 	mesh->vertexBucket = createBucketAlloc( alloc, "Mesh Vertices", sizeof(TESSvertex), alloc->meshVertexBucketSize );
 	mesh->faceBucket = createBucketAlloc( alloc, "Mesh Faces", sizeof(TESSface), alloc->meshFaceBucketSize );
 
+	if (mesh->edgeBucket == NULL || mesh->vertexBucket == NULL || mesh->faceBucket == NULL) {
+		deleteBucketAlloc( mesh->edgeBucket );
+		deleteBucketAlloc( mesh->vertexBucket );
+		deleteBucketAlloc( mesh->faceBucket );
+		alloc->memfree( alloc->userData, mesh );
+		return NULL;
+	}
+
 	v = &mesh->vHead;
 	f = &mesh->fHead;
 	e = &mesh->eHead;
@@ -619,8 +630,6 @@ TESSmesh *tessMeshNewMesh( TESSalloc* alloc )
 
 	f->next = f->prev = f;
 	f->anEdge = NULL;
-	f->trail = NULL;
-	f->marked = FALSE;
 	f->inside = FALSE;
 
 	e->next = e;

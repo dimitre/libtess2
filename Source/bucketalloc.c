@@ -100,6 +100,8 @@ struct BucketAlloc* createBucketAlloc( TESSalloc* alloc, const char* name,
 									  unsigned int itemSize, unsigned int bucketSize )
 {
 	BucketAlloc* ba = (BucketAlloc*)alloc->memalloc( alloc->userData, sizeof(BucketAlloc) );
+	if ( ba == NULL )
+		return 0;
 
 	ba->alloc = alloc;
 	ba->name = name;
@@ -132,13 +134,15 @@ void* bucketAlloc( struct BucketAlloc *ba )
 
 	// Pop item from in front of the free list.
 	it = ba->freelist;
-	ba->freelist = NextFreeItem( ba );
+	ba->freelist = *(void**)it;
 
 	return it;
 }
 
 void bucketFree( struct BucketAlloc *ba, void *ptr )
 {
+	if ( ptr == NULL )
+		return;
 #ifdef CHECK_BOUNDS
 	int inBounds = 0;
 	Bucket *bucket;
@@ -165,7 +169,7 @@ void bucketFree( struct BucketAlloc *ba, void *ptr )
 	}
 	else
 	{
-		printf("ERROR! pointer 0x%p does not belong to allocator '%s'\n", ba->name);
+		printf("ERROR! pointer 0x%p does not belong to allocator '%s'\n", ptr, ba->name);
 	}
 #else
 	// Add the node in front of the free list.
@@ -176,8 +180,12 @@ void bucketFree( struct BucketAlloc *ba, void *ptr )
 
 void deleteBucketAlloc( struct BucketAlloc *ba )
 {
-	TESSalloc* alloc = ba->alloc;
-	Bucket *bucket = ba->buckets;
+	TESSalloc* alloc;
+	Bucket *bucket;
+	if ( ba == NULL )
+		return;
+	alloc = ba->alloc;
+	bucket = ba->buckets;
 	Bucket *next;
 	while ( bucket )
 	{

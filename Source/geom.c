@@ -72,27 +72,10 @@ TESSreal tesedgeEval( TESSvertex *u, TESSvertex *v, TESSvertex *w )
 	return 0;
 }
 
-TESSreal tesedgeSign( TESSvertex *u, TESSvertex *v, TESSvertex *w )
-{
-	/* Returns a number whose sign matches EdgeEval(u,v,w) but which
-	* is cheaper to evaluate.  Returns > 0, == 0 , or < 0
-	* as v is above, on, or below the edge uw.
-	*/
-	TESSreal gapL, gapR;
-
-	assert( VertLeq( u, v ) && VertLeq( v, w ));
-
-	gapL = v->s - u->s;
-	gapR = w->s - v->s;
-
-	if( gapL + gapR > 0 ) {
-		TESSreal result = (v->t - w->t) * gapL + (v->t - u->t) * gapR;
-		return isnan(result) ? 0 : result;
-	}
-	/* vertical line */
-	return 0;
-}
-
+/* NOTE: the cheaper-to-evaluate tesedgeSign() was removed because geom.h maps
+* EdgeSign to tesedgeEval() (see the note there about github issue #22), so it
+* had no callers.  testransSign() below is still used via the TransSign macro.
+*/
 
 /***********************************************************************
 * Define versions of EdgeSign, EdgeEval with s and t transposed.
